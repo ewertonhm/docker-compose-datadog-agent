@@ -1,0 +1,69 @@
+version: '3'
+
+services:
+  agent:
+    #image: datadog/agent:latest
+    build: datadog
+    container_name: datadog-agent
+    environment:
+      - DD_API_KEY=<API-KEY> # informar api key
+      - DD_APM_ENABLED=true
+      - DD_LOGS_ENABLED=false # alterar para true para coletar logs
+      - DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL=true
+      - DD_PROCESS_AGENT_ENABLED=true
+      - DD_TAGS=env:prod # adicionar tags
+      - DD_CONTAINER_LABELS_AS_TAGS={"*":"%%label%%"}      
+      - DD_HOSTNAME=ewerton-docker
+        # - DD_LOG_LEVEL=WARN
+        # - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+        # - DD_SYSTEM_PROBE_NETWORK_ENABLED=false # alterar para true para habilitar NPM
+      - DD_DOGSTATSD_SOCKET=/var/run/datadog/dsd.socket # habilita socket para dogstatd
+      - DD_APM_RECEIVER_SOCKET=/var/run/datadog/apm.socket # habilita socket para apm
+    ports:
+      - "8126:8126"
+      - "8125:8125"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /proc/:/host/proc/:ro
+      - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+      - /var/run/datadog:/var/run/datadog
+      - /etc/passwd:/etc/passwd:ro
+      - /sys/kernel/debug:/sys/kernel/debug
+    cap_add:
+    - SYS_ADMIN
+    - SYS_RESOURCE
+    - SYS_PTRACE
+    - NET_ADMIN
+    - NET_BROADCAST
+    - NET_RAW
+    - IPC_LOCK
+    - CHOWN
+    security_opt:
+    - apparmor:unconfined
+    networks:
+      - datadog
+  web:
+    build: web
+    command: python app.py
+    labels:
+      project: "api"
+    ports:
+     - "5000:5000"
+    volumes:
+     - ./web:/code # modified here to take into account the new app path
+    links:
+     - redis
+    environment:
+     - DATADOG_HOST=datadog # used by the web app to initialize the Datadog library
+    networks:
+      - datadog
+  redis:
+    image: redis
+    labels:
+      project: "redis"
+    networks:
+      - datadog    
+networks:
+  datadog:
+    driver: bridge
